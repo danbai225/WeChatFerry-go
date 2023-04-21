@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-var BUFFER_SIZE = 16 * 1024 * 1024
-
 func TestConn(t *testing.T) {
 	socket, err := pair1.NewSocket()
 	if err != nil {

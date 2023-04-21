@@ -5,6 +5,7 @@ import (
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol"
 	"go.nanomsg.org/mangos/v3/protocol/pair1"
+	_ "go.nanomsg.org/mangos/v3/transport/all"
 	"google.golang.org/protobuf/proto"
 	"strconv"
 	"strings"
