@@ -160,7 +160,7 @@ func TestRefreshPYQ(t *testing.T) {
 	defer wcf.DisableRecvTxt()
 	time.Sleep(time.Second * 2)
 	logs.Info(wcf.RefreshPYQ())
-	select {}
+	time.Sleep(time.Minute)
 }
 
 func TestOnMSG(t *testing.T) {
