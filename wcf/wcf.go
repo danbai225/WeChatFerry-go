@@ -167,7 +167,7 @@ func (c *Client) AcceptFriend(v3, v4 string, scene int32) int32 {
 func (c *Client) AddChatroomMembers(roomID, wxIDs string) int32 {
 	req := genFunReq(Functions_FUNC_ADD_ROOM_MEMBERS)
 	q := Request_M{
-		M: &AddMembers{Roomid: roomID, Wxids: wxIDs},
+		M: &MemberMgmt{Roomid: roomID, Wxids: wxIDs},
 	}
 	req.Msg = &q
 	err := c.send(req.build())
@@ -210,10 +210,101 @@ func (c *Client) ReceiveTransfer(wxid, tfid, taid string) int32 {
 }
 
 // RefreshPYQ 刷新朋友圈
-func (c *Client) RefreshPYQ() int32 {
+func (c *Client) RefreshPYQ(id uint64) int32 {
 	req := genFunReq(Functions_FUNC_REFRESH_PYQ)
 	q := Request_Ui64{
-		Ui64: 0,
+		Ui64: id,
+	}
+	req.Msg = &q
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	return recv.GetStatus()
+}
+
+/*
+DownloadAttach
+下载附件（图片、视频、文件）。这方法别直接调用，下载图片使用 `download_image`。
+
+	Args:
+	    id (int): 消息中 id
+	    thumb (str): 消息中的 thumb
+	    extra (str): 消息中的 extra
+
+	Returns:
+	    int: 0 为成功, 其他失败。
+*/
+func (c *Client) DownloadAttach(id uint64, thumb string, extra string) int32 {
+	req := genFunReq(Functions_FUNC_DOWNLOAD_ATTACH)
+	q := Request_Att{
+		Att: &AttachMsg{
+			Id:    id,
+			Thumb: thumb,
+			Extra: extra,
+		},
+	}
+	req.Msg = &q
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	return recv.GetStatus()
+}
+
+/*
+GetContactInfo
+通过 wxid 查询微信号昵称等信息
+
+	Args:
+	    wxid (str): 联系人 wxid
+
+	Returns:
+	    dict: {wxid, code, name, gender}
+*/
+func (c *Client) GetContactInfo(wxId string) *RpcContact {
+	req := genFunReq(Functions_FUNC_GET_CONTACT_INFO)
+	q := Request_Str{
+		Str: wxId,
+	}
+	req.Msg = &q
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	contacts := recv.GetContacts().GetContacts()
+	if len(contacts) > 0 {
+		return contacts[0]
+	}
+	return nil
+}
+
+/*
+Revoke
+撤回消息
+
+	Args:
+	    id (int): 待撤回消息的 id
+
+	Returns:
+	    int: 1 为成功，其他失败
+*/
+func (c *Client) Revoke(id uint64) int32 {
+	req := genFunReq(Functions_FUNC_REVOKE_MSG)
+	q := Request_Ui64{
+		Ui64: id,
 	}
 	req.Msg = &q
 	err := c.send(req.build())
@@ -245,10 +336,36 @@ func (c *Client) DecryptImage(src, dst string) int32 {
 	return recv.GetStatus()
 }
 
+/*
+ExecOCR
+获取 OCR 结果。鸡肋，需要图片能自动下载；通过下载接口下载的图片无法识别。
+
+	Args:
+	    extra (str): 待识别的图片路径，消息里的 extra
+
+	Returns:
+	    str: OCR 结果
+*/
+func (c *Client) ExecOCR(extra string) string {
+	req := genFunReq(Functions_FUNC_EXEC_OCR)
+	q := Request_Str{
+		Str: extra,
+	}
+	req.Msg = &q
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	return recv.GetStr()
+}
 func (c *Client) AddChatRoomMembers(roomId string, wxIds []string) int32 {
 	req := genFunReq(Functions_FUNC_ADD_ROOM_MEMBERS)
 	q := Request_M{
-		M: &AddMembers{Roomid: roomId,
+		M: &MemberMgmt{Roomid: roomId,
 			Wxids: strings.Join(wxIds, ",")},
 	}
 	req.Msg = &q
@@ -265,7 +382,36 @@ func (c *Client) AddChatRoomMembers(roomId string, wxIds []string) int32 {
 func (c *Client) DelChatRoomMembers(roomId string, wxIds []string) int32 {
 	req := genFunReq(Functions_FUNC_DEL_ROOM_MEMBERS)
 	q := Request_M{
-		M: &AddMembers{Roomid: roomId,
+		M: &MemberMgmt{Roomid: roomId,
+			Wxids: strings.Join(wxIds, ",")},
+	}
+	req.Msg = &q
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	return recv.GetStatus()
+}
+
+/*
+InvChatRoomMembers
+邀请群成员
+
+	Args:
+	    roomid (str): 群的 id
+	    wxids (str): 要邀请成员的 wxid, 多个用逗号`,`分隔
+
+	Returns:
+	    int: 1 为成功，其他失败
+*/
+func (c *Client) InvChatRoomMembers(roomId string, wxIds []string) int32 {
+	req := genFunReq(Functions_FUNC_INV_ROOM_MEMBERS)
+	q := Request_M{
+		M: &MemberMgmt{Roomid: roomId,
 			Wxids: strings.Join(wxIds, ",")},
 	}
 	req.Msg = &q
@@ -289,6 +435,34 @@ func (c *Client) GetUserInfo() *UserInfo {
 		logs.Err(err)
 	}
 	return recv.GetUi()
+}
+
+// GetAudio 获取语音消息并转成 MP3
+/*
+Args:
+            id (int): 消息中 id
+            dir (str): 存放图片的目录
+
+        Returns:
+            str: 成功返回存储路径；空字符串为失败，原因见日志。
+*/
+func (c *Client) GetAudio(id uint64, dir string) string {
+	req := genFunReq(Functions_FUNC_SEND_TXT)
+	req.Msg = &Request_Am{
+		Am: &AudioMsg{
+			Id:  id,
+			Dir: dir,
+		},
+	}
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	return recv.GetStr()
 }
 
 /*
@@ -388,6 +562,85 @@ func (c *Client) SendEmotion(path, receiver string) int32 {
 		File: &PathMsg{
 			Path:     path,
 			Receiver: receiver,
+		},
+	}
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	return recv.GetStatus()
+}
+
+/*
+SendRichText
+发送富文本消息
+
+	卡片样式：
+	    |-------------------------------------|
+	    |title, 最长两行
+	    |(长标题, 标题短的话这行没有)
+	    |digest, 最多三行，会占位    |--------|
+	    |digest, 最多三行，会占位    |thumburl|
+	    |digest, 最多三行，会占位    |--------|
+	    |(account logo) name
+	    |-------------------------------------|
+	Args:
+	    name (str): 左下显示的名字
+	    account (str): 填公众号 id 可以显示对应的头像（gh_ 开头的）
+	    title (str): 标题，最多两行
+	    digest (str): 摘要，三行
+	    url (str): 点击后跳转的链接
+	    thumburl (str): 缩略图的链接
+	    receiver (str): 接收人, wxid 或者 roomid
+
+	Returns:
+	    int: 0 为成功，其他失败
+*/
+func (c *Client) SendRichText(name, account, title, digest, url, thumbUrl, receiver string) int32 {
+	req := genFunReq(Functions_FUNC_SEND_RICH_TXT)
+	req.Msg = &Request_Rt{
+		Rt: &RichText{
+			Name:     name,
+			Account:  account,
+			Title:    title,
+			Digest:   digest,
+			Url:      url,
+			Thumburl: thumbUrl,
+			Receiver: receiver,
+		},
+	}
+	err := c.send(req.build())
+	if err != nil {
+		logs.Err(err)
+	}
+	recv, err := c.Recv()
+	if err != nil {
+		logs.Err(err)
+	}
+	return recv.GetStatus()
+}
+
+/*
+SendPat
+拍一拍群友
+
+	Args:
+	    roomid (str): 群 id
+	    wxid (str): 要拍的群友的 wxid
+
+	Returns:
+	    int: 1 为成功，其他失败
+*/
+func (c *Client) SendPat(roomId, wxId string) int32 {
+	req := genFunReq(Functions_FUNC_SEND_RICH_TXT)
+	req.Msg = &Request_Pm{
+		Pm: &PatMsg{
+			Roomid: roomId,
+			Wxid:   wxId,
 		},
 	}
 	err := c.send(req.build())
