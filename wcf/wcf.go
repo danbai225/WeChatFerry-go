@@ -666,7 +666,6 @@ func (c *Client) EnableRecvTxt() int32 {
 	if err != nil {
 		logs.Err(err)
 	}
-	c.RecvTxt = true
 	return recv.GetStatus()
 }
 func (c *Client) DisableRecvTxt() int32 {
@@ -682,6 +681,7 @@ func (c *Client) DisableRecvTxt() int32 {
 	return recv.GetStatus()
 }
 func (c *Client) OnMSG(f func(msg *WxMsg)) error {
+	c.RecvTxt = true
 	socket, err := pair1.NewSocket()
 	if err != nil {
 		return err
