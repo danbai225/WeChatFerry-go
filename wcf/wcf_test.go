@@ -173,6 +173,8 @@ func TestOnMSG(t *testing.T) {
 	defer func() {
 		logs.Info(wcf.DisableRecvTxt())
 	}()
+	// 设置监听状态开启 否则会出现无消息返回
+	wcf.RecvTxt = true
 	go wcf.OnMSG(func(msg *WxMsg) {
 		logs.Info(msg.GetContent())
 	})
