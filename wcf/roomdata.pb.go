@@ -4,7 +4,7 @@
 // 	protoc        v4.25.0
 // source: proto/roomdata.proto
 
-package wechat
+package wcf
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
