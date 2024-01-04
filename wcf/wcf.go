@@ -1,14 +1,15 @@
 package wcf
 
 import (
+	"strconv"
+	"strings"
+
 	logs "github.com/danbai225/go-logs"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol"
 	"go.nanomsg.org/mangos/v3/protocol/pair1"
 	_ "go.nanomsg.org/mangos/v3/transport/all"
 	"google.golang.org/protobuf/proto"
-	"strconv"
-	"strings"
 )
 
 type Client struct {
@@ -164,6 +165,39 @@ func (c *Client) AcceptFriend(v3, v4 string, scene int32) int32 {
 	}
 	return recv.GetStatus()
 }
+
+// GetChatRoomMembers 获取群成员列表
+func (c *Client) GetChatRoomMembers(roomid string) []*RpcContact {
+	members := []*RpcContact{}
+	// get user data
+	userRds := c.ExecDBQuery("MicroMsg.db", "SELECT UserName, NickName FROM Contact;")
+	userMap := map[string]string{}
+	for _, user := range userRds {
+		wxid := string(user.Fields[0].Content)
+		userMap[wxid] = string(user.Fields[1].Content)
+	}
+	// get room data
+	roomRds := c.ExecDBQuery("MicroMsg.db", "SELECT RoomData FROM ChatRoom WHERE ChatRoomName = '"+roomid+"';")
+	if len(roomRds) == 0 || len(roomRds[0].Fields) == 0 {
+		return members
+	}
+	roomData := &RoomData{}
+	if err := proto.Unmarshal(roomRds[0].Fields[0].Content, roomData); err != nil {
+		return members
+	}
+	// fix username
+	for _, member := range roomData.Members {
+		if member.Name == "" {
+			member.Name = userMap[member.Wxid]
+		}
+		members = append(members, &RpcContact{
+			Wxid: member.Wxid,
+			Name: member.Name,
+		})
+	}
+	return members
+}
+
 func (c *Client) AddChatroomMembers(roomID, wxIDs string) int32 {
 	req := genFunReq(Functions_FUNC_ADD_ROOM_MEMBERS)
 	q := Request_M{
@@ -666,7 +700,6 @@ func (c *Client) EnableRecvTxt() int32 {
 	if err != nil {
 		logs.Err(err)
 	}
-	c.RecvTxt = true
 	return recv.GetStatus()
 }
 func (c *Client) DisableRecvTxt() int32 {
@@ -682,6 +715,7 @@ func (c *Client) DisableRecvTxt() int32 {
 	return recv.GetStatus()
 }
 func (c *Client) OnMSG(f func(msg *WxMsg)) error {
+	c.RecvTxt = true
 	socket, err := pair1.NewSocket()
 	if err != nil {
 		return err
